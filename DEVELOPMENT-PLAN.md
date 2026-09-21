@@ -606,11 +606,11 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
     `pythonVersion` 메타데이터는 `metadata.toolchain`으로 이동(**Breaking**).
   - `pi-ros-helper`: envelope/runner/TDD/증거 이관(64 테스트 통과). 엔벨로프에 `attention` 추가.
   - 각 헬퍼에 `test/core-dependency.test.ts`를 두어 코어 해석과 위임 동작을 고정.
-- **R1 실현: 어댑터 seam 부족분(코어 0.2 후보)**
-  1. `UNIVERSAL_SAFE_OVERRIDES`의 `--frozen|--locked|--list`가 너무 넓다.
-     `uv sync --frozen`을 `read`로 강등해 Python 안전 로직을 코어로 옮길 수 없게 한다.
-     (`pi-python-helper/src/core/safety.ts`는 여전히 로컬.) 안전 override를 어댑터 스코프로
-     좁히거나, 어댑터 위험 규칙을 override보다 먼저 평가해야 한다.
+- **R1 실현: 어댑터 seam 부족분**
+  1. ~~`UNIVERSAL_SAFE_OVERRIDES`의 `--frozen|--locked|--list`가 너무 넓다.~~
+     **해결(코어 0.1.2 + `pi-python-helper` 0.4.1).** 범용 override는
+     `--check|--dry-run|--collect-only`만 남겼고, `pi-python-helper/src/core/safety.ts`는
+     코어 분류기에 Python 규칙만 주입한다.
   2. `summarizeValidation`은 `lock→prepare→test→quality→conformance` 고정 형태라
      ROS의 `build→test→stale` 게이트에 맞지 않는다(문구도 lockfile 전제). 단계 배열 API가 필요하다.
   3. ROS의 컴파일된 테스트 바이너리 mtime staleness와 CTest 타겟 이름 선별은
