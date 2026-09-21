@@ -6,6 +6,16 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-21
+
+### Fixed
+
+- A project named through `path` now runs cargo and git in the resolved project root instead of `ctx.cwd`. `cargo metadata` (project inspection and test selection), `cargo test`/`cargo check`/`cargo build` (through the command preview's `cwd`), the validation bundle, and the `git diff` discovery behind `rust_test`/`rust_tdd_checkpoint` previously ran in the session directory, which failed with "could not find `Cargo.toml`" or silently read the wrong tree.
+
+### Added
+
+- `rust_tdd_checkpoint` accepts an optional `path` for git discovery.
+
 ## [0.1.1] - 2026-09-21
 
 ### Fixed

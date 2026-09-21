@@ -1,10 +1,15 @@
 {
   "name": "pi-rust-helper",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Rust (cargo) development tools for the pi coding agent",
   "type": "module",
   "license": "Apache-2.0",
-  "keywords": ["pi-package", "pi", "rust", "cargo"],
+  "keywords": [
+    "pi-package",
+    "pi",
+    "rust",
+    "cargo"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wkqco33/pi-rust-helper.git"
@@ -38,8 +43,12 @@
     "check": "npm test && npm run typecheck && npm run format:check && npm run docs:check && npm run pack-check"
   },
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
   },
   "dependencies": {
     "pi-helper-core": "^0.1.2"
