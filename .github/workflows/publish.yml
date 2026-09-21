@@ -37,8 +37,6 @@ jobs:
             echo "package.json version $version does not match release tag ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
-      - name: Fetch the shared core
-        run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies

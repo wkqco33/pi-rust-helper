@@ -24,9 +24,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      # `pi-helper-core` is a sibling `file:` dependency during local development.
-      - name: Fetch the shared core
-        run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
       - name: Install dependencies
         run: npm ci
       - name: Install the Rust toolchain
@@ -54,8 +51,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Fetch the shared core
-        run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
       - name: Install dependencies
         run: npm ci
       # The Rust-dependent tests must report an explicit skip, not a silent pass.
@@ -79,8 +74,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Fetch the shared core
-        run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
       - name: Install dependencies
         run: npm ci
       - name: Install the Rust toolchain
@@ -103,7 +96,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
       - run: npm ci
       - name: Install pi CLI
         run: npm install --global @earendil-works/pi-coding-agent

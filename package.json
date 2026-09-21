@@ -42,7 +42,7 @@
     "skills": ["./skills"]
   },
   "dependencies": {
-    "pi-helper-core": "file:../pi-helper-core"
+    "pi-helper-core": "^0.1.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
