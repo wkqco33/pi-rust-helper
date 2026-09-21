@@ -146,6 +146,7 @@ test('integration-test files are discovered from the test directories', async ()
           features: [],
           appliedFeatures: [],
           dependencies: [],
+          declared: [],
         },
       ],
     };

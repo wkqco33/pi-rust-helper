@@ -200,6 +200,54 @@ test('a drifted lockfile fails the bundle before cargo can rewrite it', rustProj
   });
 });
 
+test('unused dependencies are reported from a bounded source scan', rustProject, async () => {
+  await withFixture('unused-dependency', async (directory) => {
+    const value = await invokeTool(
+      'rust_project_inspect',
+      { scanUnusedDependencies: true },
+      directory,
+    );
+    assertEnvelope(value, 'project_inspect(unused)');
+    assert.ok(warningCodes(value).includes('UNUSED_DEPENDENCY'));
+    const data = value.data as {
+      dependencies: { unused: { findings: { member: string; dependency: string }[] } | null };
+    };
+    assert.deepEqual(data.dependencies.unused?.findings, [
+      { member: 'app', dependency: 'util', crate: 'util', kind: 'normal' },
+    ]);
+  });
+});
+
+test('a feature-gated compilation gap is checked only when requested', rustProject, async () => {
+  await withFixture('basic-workspace', async (directory) => {
+    await primeLockfile(directory);
+    const skipped = await invokeTool(
+      'rust_test_select',
+      { changedPaths: ['crates/core/src/lib.rs'] },
+      directory,
+    );
+    assertEnvelope(skipped, 'test_select(no feature check)');
+    assert.equal(
+      (skipped.data as { featureCheck: { executed: boolean } }).featureCheck.executed,
+      false,
+    );
+
+    const checked = await invokeTool(
+      'rust_test_select',
+      { changedPaths: ['crates/core/src/lib.rs'], checkAllFeatures: true },
+      directory,
+    );
+    assertEnvelope(checked, 'test_select(all features)');
+    assert.equal(checked.ok, true, checked.summary);
+    const featureCheck = (
+      checked.data as { featureCheck: { executed: boolean; ok: boolean; errorCount: number } }
+    ).featureCheck;
+    assert.equal(featureCheck.executed, true);
+    assert.equal(featureCheck.ok, true);
+    assert.equal(featureCheck.errorCount, 0);
+  });
+});
+
 test('the shared report type stays the shape the adapter promises', async () => {
   await withFixture('zero-tests', async (directory) => {
     const value = await invokeTool<TestData>('rust_test', { execute: true }, directory);
