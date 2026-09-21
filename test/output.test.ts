@@ -138,6 +138,36 @@ test('a build failure leaves the report incomplete', () => {
   assert.match(report.commandError ?? '', /could not compile/);
 });
 
+test('ANSI colour from CARGO_TERM_COLOR=always does not hide sections', () => {
+  // GitHub Actions sets CARGO_TERM_COLOR=always, so cargo colourises the
+  // headers. A line-oriented parse must not depend on the environment.
+  const colored = WORKSPACE_RUN.replace(
+    /^(\s*)(Running|Doc-tests)/gm,
+    '\u001b[1m\u001b[92m$1$2\u001b[0m',
+  );
+  const report = parseTestOutput(colored, '');
+  assert.deepEqual(
+    report.sections.map((section) => section.kind),
+    ['unittests', 'unittests', 'doctests'],
+  );
+  assert.equal(report.includedDocTests, true);
+  assert.deepEqual(report.testedPackages, ['probe-app', 'probe-core']);
+});
+
+test('headers on a coloured stderr stream are still paired with stdout results', () => {
+  const headerLines = WORKSPACE_RUN.split('\n').filter((line) =>
+    /^\s*(Running|Doc-tests)/.test(line),
+  );
+  const stderr = headerLines.map((line) => `\u001b[1m\u001b[92m${line}\u001b[0m`).join('\n');
+  const stdout = WORKSPACE_RUN.split('\n')
+    .filter((line) => !/^\s*(Running|Doc-tests)/.test(line))
+    .join('\n');
+  const report = parseTestOutput(stdout, stderr);
+  assert.equal(report.sections.length, 3);
+  assert.equal(report.includedDocTests, true);
+  assert.equal(report.counts.passed, 3);
+});
+
 test('package ids reduce to the package name', () => {
   assert.equal(packageNameFromId(APP), 'probe-app');
   assert.equal(

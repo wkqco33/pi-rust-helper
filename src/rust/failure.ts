@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { FailureDiagnosis, FailureFrame, Suggestion } from 'pi-helper-core';
+import { stripAnsi } from './ansi.ts';
 
 /**
  * Rust failure diagnosis.
@@ -247,7 +248,7 @@ export function parseCompilerDiagnostics(
   options: DiagnoseOptions = {},
 ): RustDiagnostic[] {
   const diagnostics: RustDiagnostic[] = [];
-  for (const rawLine of output.split(/\r?\n/)) {
+  for (const rawLine of stripAnsi(output).split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line.startsWith('{')) continue;
     let parsed: { reason?: string; message?: RawCompilerMessage };
@@ -276,13 +277,15 @@ export function diagnoseRustFailure(
   output: string,
   options: DiagnoseOptions = {},
 ): FailureDiagnosis {
+  // Colour escapes from `CARGO_TERM_COLOR=always` would break the text fallback.
+  const clean = stripAnsi(output);
   const evidence: { message: string; file?: string; line?: number }[] = [];
   let code: string | undefined;
   let message = '';
   let spans: RawSpan[] = [];
   const children: string[] = [];
 
-  for (const rawLine of output.split(/\r?\n/)) {
+  for (const rawLine of clean.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line.startsWith('{')) continue;
     let parsed: { reason?: string; message?: RawCompilerMessage };
@@ -304,12 +307,12 @@ export function diagnoseRustFailure(
 
   if (!message) {
     // Text fallback: short/plain rendering, or truncated output with no JSON.
-    const header = output.match(/^error(?:\[([A-Z]\d{4})\])?:\s*(.+)$/m);
+    const header = clean.match(/^error(?:\[([A-Z]\d{4})\])?:\s*(.+)$/m);
     if (header) {
       code = header[1];
       message = header[2].trim();
     }
-    const arrow = output.match(/^\s*-->\s+([^\s:]+):(\d+):(\d+)/m);
+    const arrow = clean.match(/^\s*-->\s+([^\s:]+):(\d+):(\d+)/m);
     if (arrow)
       spans = [
         {
@@ -319,7 +322,7 @@ export function diagnoseRustFailure(
           is_primary: true,
         },
       ];
-    for (const child of output.matchAll(/^note:\s*(.+)$/gm)) children.push(child[1]);
+    for (const child of clean.matchAll(/^note:\s*(.+)$/gm)) children.push(child[1]);
   }
 
   if (!message) {

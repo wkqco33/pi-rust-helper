@@ -1,4 +1,5 @@
 import type { TestCounts, TestFailure, TestReport } from 'pi-helper-core';
+import { stripAnsi } from './ansi.ts';
 
 /**
  * Parser for cargo's test output.
@@ -218,12 +219,16 @@ function parseJsonLine(
  * by the caller from the `RunResult`, because the output alone cannot prove them.
  */
 export function parseTestOutput(stdout: string, stderr: string): RustTestReport {
+  // Colour escapes would otherwise make every line regex miss (CI sets
+  // `CARGO_TERM_COLOR=always`), so all parsing runs on the stripped text.
+  const cleanStdout = stripAnsi(stdout);
+  const cleanStderr = stripAnsi(stderr);
   const artifacts: RustArtifactTarget[] = [];
   const stdoutLines: string[] = [];
   let buildFinished = false;
   let buildSuccess: boolean | undefined;
 
-  for (const rawLine of stdout.split(/\r?\n/)) {
+  for (const rawLine of cleanStdout.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (line.startsWith('{')) {
       const json = parseJsonLine(line, artifacts);
@@ -236,7 +241,7 @@ export function parseTestOutput(stdout: string, stderr: string): RustTestReport 
     }
     stdoutLines.push(rawLine);
   }
-  const stderrLines = stderr.split(/\r?\n/);
+  const stderrLines = cleanStderr.split(/\r?\n/);
 
   // Headers live on stdout with the default message format and on stderr with
   // `--message-format=json`; prefer whichever stream actually carried them.
@@ -261,7 +266,7 @@ export function parseTestOutput(stdout: string, stderr: string): RustTestReport 
     section.hadResult = true;
   }
 
-  const combined = `${stdout}\n${stderr}`;
+  const combined = `${cleanStdout}\n${cleanStderr}`;
   const compileErrorCount = (combined.match(/^error(?:\[[A-Z]\d{4}\])?:/gm) ?? []).length;
   const commandError = combined.match(/^error:\s*(.+)$/m)?.[1]?.trim();
 

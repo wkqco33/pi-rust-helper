@@ -92,6 +92,18 @@ test('the text fallback still finds a project frame', () => {
   assert.equal(diagnosis.firstUserFrame?.line, 4);
 });
 
+test('coloured compiler output is still parsed', () => {
+  const output = [
+    '\u001b[1m\u001b[91merror[E0277]\u001b[0m: the trait bound `Foo: Bar` is not satisfied',
+    '\u001b[1m\u001b[94m --> \u001b[0msrc/lib.rs:4:5',
+  ].join('\n');
+  const diagnosis = diagnoseRustFailure(output, { projectRoot: '/ws' });
+  assert.equal(diagnosis.kind, 'trait_bound');
+  assert.equal(diagnosis.exceptionType, 'E0277');
+  assert.equal(diagnosis.firstUserFrame?.path, 'src/lib.rs');
+  assert.equal(diagnosis.firstUserFrame?.line, 4);
+});
+
 test('a missing cargo subcommand is named', () => {
   const diagnosis = diagnoseRustFailure('error: no such command: `nextest`', {});
   assert.equal(diagnosis.kind, 'missing_executable');
