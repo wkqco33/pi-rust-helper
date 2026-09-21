@@ -1,20 +1,41 @@
 {
   "name": "pi-rust-helper",
   "version": "0.1.0",
-  "private": true,
   "description": "Rust (cargo) development tools for the pi coding agent",
   "type": "module",
   "license": "Apache-2.0",
   "keywords": ["pi-package", "pi", "rust", "cargo"],
-  "engines": {
-    "node": ">=20"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wkqco33/pi-rust-helper.git"
   },
+  "bugs": {
+    "url": "https://github.com/wkqco33/pi-rust-helper/issues"
+  },
+  "homepage": "https://github.com/wkqco33/pi-rust-helper#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "skills",
+    "docs/tools.md",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "format": "prettier --write \"src/**/*.ts\" \"extensions/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"extensions/**/*.ts\" \"test/**/*.ts\"",
-    "check": "npm test && npm run typecheck && npm run format:check"
+    "test:coverage": "tsx --test --experimental-test-coverage test/*.test.ts",
+    "test:e2e": "tsx test/manual/e2e-rust.ts",
+    "docs": "tsx scripts/generate-tools-doc.ts",
+    "docs:check": "tsx scripts/check-docs.ts",
+    "format": "prettier --write \"extensions/**/*.ts\" \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
+    "format:check": "prettier --check \"extensions/**/*.ts\" \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
+    "pack-check": "node scripts/verify-pack.mjs",
+    "check": "npm test && npm run typecheck && npm run format:check && npm run docs:check && npm run pack-check"
   },
   "pi": {
     "extensions": ["./extensions"],
@@ -24,12 +45,11 @@
     "pi-helper-core": "file:../pi-helper-core"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
   },
-  "peerDependenciesMeta": {
-    "@earendil-works/pi-coding-agent": {
-      "optional": true
-    }
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
