@@ -13,16 +13,18 @@ license: Apache-2.0
 1. 툴체인 상태가 불확실할 때는 `rust_environment`를 실행하세요. `rust-toolchain.toml`이 설치되지 않은 채널을 지정하면 `cargo`/`rustc` 실행만으로 rustup이 수백 MB를 다운로드합니다. 도구는 `~/.rustup/toolchains`를 읽어 `TOOLCHAIN_NOT_INSTALLED`를 먼저 보고하므로, 이 오류가 보이면 `rustup toolchain install <channel>` 전에는 어떤 cargo 명령도 실행하지 마세요.
 2. `Cargo.toml`을 편집하기 전이나 워크스페이스 구성이 불확실할 때 `rust_project_inspect`를 사용하세요. 멤버, `default-members`, edition, MSRV(`rust-version`), 타깃, **실제 적용된 feature 집합**(`resolve.nodes`)을 보고합니다. `membersOutsideDefault`는 bare `cargo` 명령이 놓치는 크레이트입니다.
 3. `rust-version` > 활성 release이면 `MSRV_UNSATISFIED`가 발생합니다. 테스트를 신뢰하기 전에 toolchain을 맞추세요.
-4. 소스 변경 후에는 `rust_test_select`로 변경 파일을 크레이트로 매핑하세요. Rust에는 파일 단위 테스트 타깃이 없으므로 결과는 **크레이트 집합**입니다. `affectedCrates`는 역의존 그래프를 포함하므로 `-p` 타깃으로 그대로 쓰면 됩니다. `narrowed: false`는 모든 멤버가 영향받았다는 뜻입니다.
-5. 테스트 실행은 `rust_test`를 사용하고 `execute=false`로 먼저 미리보기하세요. 기본은 `--workspace`입니다. `workspace:false`는 bare `cargo test`를 재현하는 용도이며, 이때 `DEFAULT_MEMBERS_ONLY`가 발생하면 그 실행은 워크스페이스를 검증하지 못한 것입니다.
-6. `rust_test` 응답을 읽을 때는 `counts`만 보지 말고 `ranTargets`, `testedPackages`, `missingMembers`, `includedDocTests`를 함께 보세요. 실행 범위를 숨기지 않는 것이 이 도구의 존재 이유입니다.
-7. `noTestsRan: true`이면 결과는 증거가 아닙니다(`ZERO_TESTS_RUN`). 필터가 모든 테스트를 걸러냈거나 필터/타깃 이름이 틀렸을 가능성을 확인하세요.
-8. `docTests: false`(또는 `--tests`)는 doc test를 제외합니다. `DOCTESTS_SKIPPED`가 뜨면 의도한 것인지 확인하세요.
-9. 컴파일 오류는 `rust_check`로 구조화된 진단을 받으세요. `errorCodes`(E0599 등)와 `firstFailure.firstUserFrame`이 프로젝트 파일을 가리킵니다.
-10. 실패 출력이 이미 있을 때는 `rust_failure_diagnose`를 사용하세요. `~/.cargo/registry`, rustup toolchain, `library/std` 프레임은 library 위치로 분류되어 원인에서 배제됩니다. `feature_gated`는 심볼이 Cargo feature 뒤에 있다는 뜻이므로 `--all-features`로 재확인하세요.
-11. feature 통합 때문에 컴파일 결과가 여러 가지가 될 수 있습니다. `features: 'all'`/`'none'`으로 재현 범위를 명시하세요.
-12. `Cargo.lock`을 갱신해야 할 때는 도구가 대신 갱신하지 않습니다. `LOCKFILE_DRIFT`가 보이면 사용자가 직접 `cargo update`/`cargo metadata`를 실행해야 하며, lock이 최신이 되기 전에는 테스트 결과를 신뢰하지 마세요.
-13. 작업 완료를 보고하기 전에 `rust_validation_bundle`(lock → check → test → 실행 범위 → 선언된 품질 게이트)을 실행하고 `rust_completion_evidence`로 근거를 확인하세요. `rust_tdd_checkpoint`로 프로덕션 변경에 대응하는 테스트 변경이 있는지도 확인하세요.
+4. 의존성 위생이 의심되면 `rust_project_inspect`에 `scanUnusedDependencies: true`를 전달하세요. 선언되었지만 `.rs` 소스에서 참조되지 않는 의존성을 `UNUSED_DEPENDENCY`(info)로 보고합니다. derive 매크로나 build script가 이름 없이 참조할 수 있으므로 **오탐 가능**을 전제로 보고, 제거는 확인 후에만 하세요. `--no-deps`로 모델을 읽은 경우 `DEPENDENCY_GRAPH_INCOMPLETE`가 뜨므로 중복 버전/source 종류가 완전하지 않습니다.
+5. 소스 변경 후에는 `rust_test_select`로 변경 파일을 크레이트로 매핑하세요. Rust에는 파일 단위 테스트 타깃이 없으므로 결과는 **크레이트 집합**입니다. `affectedCrates`는 역의존 그래프를 포함하므로 `-p` 타깃으로 그대로 쓰면 됩니다. `narrowed: false`는 모든 멤버가 영향받았다는 뜻입니다.
+6. feature 조합이 의심되면 `checkAllFeatures: true`를 전달하세요. 영향받는 크레이트를 `--all-features`로 컴파일하며, `FEATURE_COMPILATION_FAILED`가 발생하면 기본 feature에서는 컴파일되지만 전체 feature 집합에서는 깨지는 변경입니다. `--all-features`는 대상 크레이트에만 적용되고 `data.featureCheck`에 결과가 담깁니다.
+7. 테스트 실행은 `rust_test`를 사용하고 `execute=false`로 먼저 미리보기하세요. 기본은 `--workspace`입니다. `workspace:false`는 bare `cargo test`를 재현하는 용도이며, 이때 `DEFAULT_MEMBERS_ONLY`가 발생하면 그 실행은 워크스페이스를 검증하지 못한 것입니다.
+8. `rust_test` 응답을 읽을 때는 `counts`만 보지 말고 `ranTargets`, `testedPackages`, `missingMembers`, `includedDocTests`를 함께 보세요. 실행 범위를 숨기지 않는 것이 이 도구의 존재 이유입니다.
+9. `noTestsRan: true`이면 결과는 증거가 아닙니다(`ZERO_TESTS_RUN`). 필터가 모든 테스트를 걸러냈거나 필터/타깃 이름이 틀렸을 가능성을 확인하세요.
+10. `docTests: false`(또는 `--tests`)는 doc test를 제외합니다. `DOCTESTS_SKIPPED`가 뜨면 의도한 것인지 확인하세요.
+11. 컴파일 오류는 `rust_check`로 구조화된 진단을 받으세요. `errorCodes`(E0599 등)와 `firstFailure.firstUserFrame`이 프로젝트 파일을 가리킵니다.
+12. 실패 출력이 이미 있을 때는 `rust_failure_diagnose`를 사용하세요. `~/.cargo/registry`, rustup toolchain, `library/std` 프레임은 library 위치로 분류되어 원인에서 배제됩니다. `feature_gated`는 심볼이 Cargo feature 뒤에 있다는 뜻이므로 `--all-features`로 재확인하세요.
+13. feature 통합 때문에 컴파일 결과가 여러 가지가 될 수 있습니다. `features: 'all'`/`'none'`으로 재현 범위를 명시하세요.
+14. `Cargo.lock`을 갱신해야 할 때는 도구가 대신 갱신하지 않습니다. `LOCKFILE_DRIFT`가 보이면 사용자가 직접 `cargo update`/`cargo metadata`를 실행해야 하며, lock이 최신이 되기 전에는 테스트 결과를 신뢰하지 마세요.
+15. 작업 완료를 보고하기 전에 `rust_validation_bundle`(lock → check → test → 실행 범위 → 선언된 품질 게이트)을 실행하고 `rust_completion_evidence`로 근거를 확인하세요. `rust_tdd_checkpoint`로 프로덕션 변경에 대응하는 테스트 변경이 있는지도 확인하세요.
 
 ## 안전 규칙 (Safety)
 
@@ -42,3 +44,7 @@ license: Apache-2.0
 - `RESOLVE_UNAVAILABLE`는 lock이 없어 `--no-deps`로 읽었다는 뜻입니다. 이 상태에서는 적용 feature와 전체 의존 그래프가 알려지지 않습니다.
 - `UNMATCHED_CHANGED_PATHS`는 변경 파일이 어떤 멤버에도 매핑되지 않았다는 뜻입니다(문서, 스크립트, 워크스페이스 밖 경로). Rust 소스 변경이 아니면 테스트 선별 대상이 아닙니다.
 - `WORKSPACE_MEMBER_MISSING`은 `members` 글롭이 아무 패키지도 매칭하지 않았다는 뜻입니다. 크레이트가 조용히 워크스페이스 밖에 있을 수 있습니다.
+- `UNUSED_DEPENDENCY`는 **정보성 힌트**입니다. `attention`을 올리지 않으며, derive 매크로(`#[derive(Serialize)]`)나 build script가 의존성을 이름 없이 참조하면 오탐입니다. `data.dependencies.unused.incompleteReason`이 있으면 스캔이 예산에 걸려 일부만 검사한 것이므로 빈 목록을 "미사용 없음"으로 단정하지 마세요. `optional = true` 의존성은 feature로만 활성화되므로 검사 대상에서 제외됩니다.
+- `FEATURE_COMPILATION_FAILED`는 기본 feature 컴파일은 통과했지만 `--all-features`에서만 깨지는 변경이 있다는 뜻입니다. 릴리스 매트릭스가 전체 feature를 포함한다면 반드시 수정하세요.
+- `DUPLICATE_DEPENDENCY_MAJOR`는 같은 크레이트가 서로 다른 major 버전으로 해석되었다는 뜻이고, `DUPLICATE_DEPENDENCY_VERSION`(info)은 호환 범위 내 중복입니다. 후자는 trait 불일치의 원인이 아닐 수 있습니다.
+- `DEPENDENCY_GRAPH_INCOMPLETE`는 lockfile이 없어 `--no-deps`로 읽었다는 뜻입니다. 이 상태에서는 중복 버전과 source 종류가 완전하지 않습니다.

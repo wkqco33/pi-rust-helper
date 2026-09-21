@@ -1,6 +1,6 @@
 # pi-rust-helper 개발 계획
 
-> 상태: **M0·M1·M2 구현 완료, M3 일부** · 작성일 2026-09-21 · 구현일 2026-09-21
+> 상태: **M0·M1·M2·M3 구현 완료** · 작성일 2026-09-21 · 구현일 2026-09-21
 > 이 문서는 다음 pi 세션의 진입점입니다. 작업은 이 저장소를 cwd로 pi를 구동해 진행합니다.
 > 구현 현황과 남은 작업은 문서 끝의 **구현 현황** 절을 참고하세요.
 
@@ -562,8 +562,8 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
 
 ## 13. 구현 현황 (2026-09-21)
 
-`pi-helper-core`(별도 저장소, 0.1.1)를 `file:` 의존으로 가져와 Rust 파일럿을 구현했다.
-`npm run check`(78 테스트 + typecheck + format + docs + pack)와
+`pi-helper-core`는 npm에 배포된 **0.1.1**을 `^0.1.1`로 의존한다(로컬 `file:` 아님).
+`npm run check`(86 테스트 + typecheck + format + docs + pack)와
 `npm run test:e2e`(5/5)가 통과한다.
 
 ### 완료
@@ -573,8 +573,8 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
 | M0 | 코어 연동, envelope/attention 불변식 테스트(`test/helpers/harness.ts`의 `assertEnvelope`) |
 | M1 | `rust_environment`, `rust_project_inspect`, `rust_test`, `rust_validation_bundle`, `rust_completion_evidence` |
 | M2 | `rust_check`, `rust_test_select`, `rust_failure_diagnose`, `rust_tdd_checkpoint` |
-| M3 | `rust_build` (mutating + `ctx.ui.confirm`). 의존성 분석은 `rust_project_inspect`의 `data.dependencies`로 흡수 |
-| 회귀 | `default-members` 거짓 초록, 0개 테스트, `--tests` doc test 누락, 컴파일 오류 프레임, MSRV — 픽스처로 고정 |
+| M3 | `rust_build` (mutating + `ctx.ui.confirm`). `rust_dependency_plan`은 `rust_project_inspect`로 흡수(중복 버전/source 통계 + `scanUnusedDependencies` 스캔). `rust_test_select.checkAllFeatures`가 계획의 "컴파일 공백"을 담당 |
+| 회귀 | `default-members` 거짓 초록, 0개 테스트, `--tests` doc test 누락, 컴파일 오류 프레임, MSRV, 미사용 의존성 — 픽스처로 고정 |
 
 ### 계획과 달라진 결정 (근거 포함)
 
@@ -586,8 +586,9 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
 2. **모델 읽기는 파일을 변조하지 않는다.** lockfile이 있으면 `--locked`, 없으면
    `--no-deps`로 `cargo metadata`를 실행한다. `--offline` 단독 실행은 드리프트를
    조용히 복구해 버리므로, 드리프트는 `LOCKFILE_DRIFT`로 보고하고 `cargo check`/`test`를
-   건너뛴다. `rust_project_inspect`는 이제 `rust_dependency_plan`의 중복 버전·git 의존성
-   분석을 `data.dependencies`로 제공한다(미사용 의존성 스캔만 미구현).
+   건너뛴다. `rust_project_inspect`는 `rust_dependency_plan`의 중복 버전·source 종류·
+   미사용 의존성 분석을 `data.dependencies`로 제공한다(미사용 스캔은 opt-in, 예산 초과 시
+   `incompleteReason` 공개).
 3. **`--message-format=json`을 테스트 실행에 사용한다.** stable에서 libtest JSON은
    불가능하지만 `compiler-artifact` 레코드는 stable에서도 나온다. 이를 이용해
    `ranTargets`/`testedPackages`를 헤더 추측이 아니라 구조화 데이터로 만든다.
@@ -599,14 +600,11 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
 
 ### 남은 작업
 
-- 미사용 의존성 스캔(선언했지만 소스에서 참조되지 않는 크레이트) — 저신뢰도이므로
-  `rust_project_inspect`의 별도 파라미터로 추가할 것.
-- `rust_test_select`의 `--all-features` 컴파일 공백 검사(계획 M3 "컴파일 공백").
 - 기존 두 확장(`pi-ros-helper`, `pi-python-helper`)의 코어 마이그레이션: 파일럿이
-  검증됐으므로 별도·되돌릴 수 있는 단계로 진행 가능.
-- `pi-helper-core` npm 배포 후 이 저장소의 `file:` 의존을 고정 버전으로 교체.
-- CI는 `../pi-helper-core`를 위해 코어 저장소를 clone한다. 코어가 npm에 배포되면
-  이 단계를 제거할 수 있다.
+  검증됐으므로 별도·되돌릴 수 있는 단계로 진행 가능(§11.6).
+- `pi-rust-helper` 자체의 npm 최초 배포(수동 1회 + trusted publisher 등록, 코어와 동일).
+- 선택적 확장(요구가 확인되면): `cargo nextest` JSON 파서, `--all-features` 매트릭스
+  도구화, workspace `members` 글롭과 `exclude` 교차 검증.
 
 ### 계획 §11 열린 결정에 대한 확정
 

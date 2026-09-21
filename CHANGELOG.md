@@ -11,7 +11,9 @@ All notable changes are documented here. The format follows
 ### Added
 
 - Initial `pi-rust-helper` extension: ten `rust_*` tools built on the shared
-  `pi-helper-core` envelope, adapter, validation, and selection contracts.
+  `pi-helper-core` envelope, adapter, validation, and selection contracts. The
+  core is consumed as the published `pi-helper-core@^0.1.1`, so CI installs from
+  the registry with no sibling checkout.
 - `src/rust/toolchain.ts`: toolchain discovery that reads `~/.rustup` instead of
   invoking rustup. rustup 1.29 auto-installs a toolchain named by
   `rust-toolchain.toml` even for `rustup toolchain list`, so the declared channel
@@ -30,14 +32,18 @@ All notable changes are documented here. The format follows
 - `src/rust/failure.ts`: structured `compiler-message` diagnosis keyed by error
   code (E0432/E0433/E0463/E0599/E0277/E0061/E0412/…), with registry and toolchain
   frames classified as library locations.
+- `src/rust/dependencies.ts`: an opt-in unused-dependency scan (`rust_project_inspect` with `scanUnusedDependencies=true`) with a bounded file/byte budget, ignoring `target/` and optional dependencies, and reporting an incomplete scan instead of a clean one when the budget is hit.
+- `rust_test_select` `checkAllFeatures`: compiles the affected crates with `--all-features` and reports `FEATURE_COMPILATION_FAILED` when a change only builds under the default feature set.
+- `rust_project_inspect` dependency summary: duplicate versions, registry/git/path source counts, and `DUPLICATE_DEPENDENCY_MAJOR` when majors disagree.
 - Tools: `rust_environment`, `rust_project_inspect`, `rust_test`,
   `rust_test_select`, `rust_check`, `rust_failure_diagnose`, `rust_tdd_checkpoint`,
   `rust_build`, `rust_validation_bundle`, `rust_completion_evidence`.
 - False-green detections: `ZERO_TESTS_RUN`, `DEFAULT_MEMBERS_ONLY`,
   `SCOPE_INCOMPLETE`, `DOCTESTS_SKIPPED`, `LOCKFILE_DRIFT`, `MSRV_UNSATISFIED`,
-  `WORKSPACE_MEMBER_MISSING`, `TOOLCHAIN_NOT_INSTALLED`, `PREVIEW_ONLY`.
+  `WORKSPACE_MEMBER_MISSING`, `TOOLCHAIN_NOT_INSTALLED`, `PREVIEW_ONLY`,
+  `FEATURE_COMPILATION_FAILED`, `DUPLICATE_DEPENDENCY_MAJOR`, `UNUSED_DEPENDENCY`.
 - Regression fixtures and tests that pin the behaviours the plan measured:
-  a `default-members` workspace, a zero-test crate, a compile error, and an MSRV
-  above the installed toolchain.
+  a `default-members` workspace, a zero-test crate, a compile error, an MSRV
+  above the installed toolchain, and an unused dependency.
 - `npm run docs:check` verifies `docs/tools.md` against the registered tool
   schemas, and `npm run pack-check` verifies the published tarball contents.

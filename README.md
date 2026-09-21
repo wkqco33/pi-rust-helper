@@ -16,9 +16,9 @@ recurs with a zero-test run (exit 0), `--tests` silently dropping doctests, and 
 | Tool | What it answers |
 |---|---|
 | `rust_environment` | Which toolchain would actually run (`rustc -vV`, cargo, rustup state, `rust-toolchain.toml`), and whether running cargo would trigger a download. |
-| `rust_project_inspect` | The workspace model from `cargo metadata --offline`: members, `default-members`, editions, MSRV, targets, applied features, lockfile drift. |
+| `rust_project_inspect` | The workspace model from `cargo metadata --offline`: members, `default-members`, editions, MSRV, targets, applied features, duplicate versions, dependency sources, and optionally unused dependencies. |
 | `rust_test` | Preview/run `cargo test` and report **what ran**: `ranTargets`, tested packages, doc-test inclusion, zero-test runs, uncovered members. |
-| `rust_test_select` | Changed files → workspace crates through the reverse-dependency graph, so a focused `-p` run replaces the whole workspace. |
+| `rust_test_select` | Changed files → workspace crates through the reverse-dependency graph, so a focused `-p` run replaces the whole workspace; `checkAllFeatures` verifies the affected crates under the full feature set. |
 | `rust_check` | `cargo check --message-format=json` with structured diagnostics by error code and first project frame. |
 | `rust_failure_diagnose` | Classify a rustc/cargo failure from JSON output, excluding registry and toolchain frames. |
 | `rust_tdd_checkpoint` | Production changes without a related test change. |
@@ -38,6 +38,9 @@ and checked in CI.
 | `SCOPE_INCOMPLETE` | A `--workspace` run did not produce a test binary for an expected member. |
 | `DOCTESTS_SKIPPED` | No `Doc-tests` section was produced although members declare doctests. |
 | `LOCKFILE_DRIFT` | `Cargo.lock` does not describe the manifests; the read did not rewrite it. |
+| `FEATURE_COMPILATION_FAILED` | The affected crates compile with default features but fail under `--all-features`. |
+| `DUPLICATE_DEPENDENCY_MAJOR` | One crate resolves to different major versions across the graph. |
+| `UNUSED_DEPENDENCY` | A declared dependency is never referenced in the member's `.rs` sources (informational). |
 | `MSRV_UNSATISFIED` | A member's `rust-version` is above the active toolchain. |
 | `TOOLCHAIN_NOT_INSTALLED` | `rust-toolchain.toml` names an uninstalled channel; cargo would download it. |
 | `TOOLCHAIN_FILE_MISMATCH` | A directory override or a missing rustup makes the declared channel ineffective. |
@@ -50,9 +53,7 @@ and checked in CI.
 pi install npm:pi-rust-helper
 ```
 
-`pi-helper-core` is a dependency; while the two are developed side by side it is
-resolved with `file:../pi-helper-core` and is pinned to a published version for
-release.
+`pi-helper-core` is a published dependency, pinned to `^0.1.1`.
 
 ## Development
 
