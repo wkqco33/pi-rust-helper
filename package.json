@@ -1,0 +1,40 @@
+{
+  "name": "pi-rust-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rust (cargo) development tools for the pi coding agent",
+  "type": "module",
+  "license": "Apache-2.0",
+  "keywords": ["pi-package", "pi", "rust", "cargo"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "format": "prettier --write \"src/**/*.ts\" \"extensions/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"extensions/**/*.ts\" \"test/**/*.ts\"",
+    "check": "npm test && npm run typecheck && npm run format:check"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  },
+  "dependencies": {
+    "pi-helper-core": "file:../pi-helper-core"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "prettier": "^3.9.8",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
