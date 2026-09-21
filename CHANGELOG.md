@@ -6,6 +6,15 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-21
+
+### Fixed
+
+- Strip ANSI escape sequences from cargo and rustc output before parsing. GitHub
+  Actions sets `CARGO_TERM_COLOR=always`, which wrapped the `Running …` and
+  `Doc-tests …` headers in colour escapes, so `includedDocTests` was reported as
+  false and the false-green contract tests failed on CI while passing locally.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added
