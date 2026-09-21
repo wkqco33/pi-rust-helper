@@ -1,0 +1,49 @@
+name: Publish npm package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm with provenance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # Deliberately no `registry-url`: `actions/setup-node` writes an
+      # `_authToken=${NODE_AUTH_TOKEN}` line that expands to empty and makes npm
+      # attempt token auth instead of the OIDC exchange, which then fails with
+      # ENEEDAUTH/E404.
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install --global npm@latest
+      - name: Show runtime versions
+        run: node --version && npm --version
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [[ "$version" != "${GITHUB_REF_NAME}" ]]; then
+            echo "package.json version $version does not match release tag ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+      - name: Fetch the shared core
+        run: git clone --depth 1 https://github.com/wkqco33/pi-helper-core.git ../pi-helper-core
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify release
+        run: npm run check
+      - name: Publish with npm Trusted Publishing
+        run: npm publish --provenance --access public

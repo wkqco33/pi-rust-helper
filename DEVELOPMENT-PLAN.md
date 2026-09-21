@@ -1,7 +1,8 @@
 # pi-rust-helper 개발 계획
 
-> 상태: **계획 단계 (코드 없음)** · 작성일 2026-09-21
+> 상태: **M0·M1·M2 구현 완료, M3 일부** · 작성일 2026-09-21 · 구현일 2026-09-21
 > 이 문서는 다음 pi 세션의 진입점입니다. 작업은 이 저장소를 cwd로 pi를 구동해 진행합니다.
+> 구현 현황과 남은 작업은 문서 끝의 **구현 현황** 절을 참고하세요.
 
 ---
 
@@ -556,3 +557,63 @@ mkdir -p packages/pi-helper-core packages/pi-rust-helper
 - 읽기 전용은 자동, 상태 변경은 `execute:true` + 필요 시 `ctx.ui.confirm`.
 - 도구 반환은 항상 코어 envelope를 사용하고 `ok`/`attention` 계약을 재정의하지 않는다.
 - 커밋 전 `npm test && npm run typecheck && npm run format:check && npm run docs:check`.
+
+---
+
+## 13. 구현 현황 (2026-09-21)
+
+`pi-helper-core`(별도 저장소, 0.1.1)를 `file:` 의존으로 가져와 Rust 파일럿을 구현했다.
+`npm run check`(78 테스트 + typecheck + format + docs + pack)와
+`npm run test:e2e`(5/5)가 통과한다.
+
+### 완료
+
+| 마일스톤 | 내용 |
+|---|---|
+| M0 | 코어 연동, envelope/attention 불변식 테스트(`test/helpers/harness.ts`의 `assertEnvelope`) |
+| M1 | `rust_environment`, `rust_project_inspect`, `rust_test`, `rust_validation_bundle`, `rust_completion_evidence` |
+| M2 | `rust_check`, `rust_test_select`, `rust_failure_diagnose`, `rust_tdd_checkpoint` |
+| M3 | `rust_build` (mutating + `ctx.ui.confirm`). 의존성 분석은 `rust_project_inspect`의 `data.dependencies`로 흡수 |
+| 회귀 | `default-members` 거짓 초록, 0개 테스트, `--tests` doc test 누락, 컴파일 오류 프레임, MSRV — 픽스처로 고정 |
+
+### 계획과 달라진 결정 (근거 포함)
+
+1. **rustup을 호출하지 않는다.** 실측: rustup 1.29는 `rustup toolchain list`와
+   `rustup show`에서도 `rust-toolchain.toml`의 미설치 채널을 **자동 다운로드**한다
+   (계획 R2보다 범위가 넓다). 그래서 `rust_environment`는 `~/.rustup/toolchains`
+   디렉터리와 `settings.toml`을 읽어 채널을 비교하고, 미설치면 `rustc`/`cargo`를
+   아예 실행하지 않는다(`TOOLCHAIN_NOT_INSTALLED`).
+2. **모델 읽기는 파일을 변조하지 않는다.** lockfile이 있으면 `--locked`, 없으면
+   `--no-deps`로 `cargo metadata`를 실행한다. `--offline` 단독 실행은 드리프트를
+   조용히 복구해 버리므로, 드리프트는 `LOCKFILE_DRIFT`로 보고하고 `cargo check`/`test`를
+   건너뛴다. `rust_project_inspect`는 이제 `rust_dependency_plan`의 중복 버전·git 의존성
+   분석을 `data.dependencies`로 제공한다(미사용 의존성 스캔만 미구현).
+3. **`--message-format=json`을 테스트 실행에 사용한다.** stable에서 libtest JSON은
+   불가능하지만 `compiler-artifact` 레코드는 stable에서도 나온다. 이를 이용해
+   `ranTargets`/`testedPackages`를 헤더 추측이 아니라 구조화 데이터로 만든다.
+   (헤더 `Running …`/`Doc-tests …`는 stderr, 결과 줄은 stdout이므로 순서로 짝지어 파싱한다.)
+4. **도구 상한 10개 유지.** 계획의 M1+M2+M3 합계는 11개였다. `rust_dependency_plan`을
+   별도 도구로 만들지 않고 `rust_project_inspect`로 흡수했다.
+5. **프리뷰는 `ok:false` + `PREVIEW_ONLY` 경고.** 코어 불변식(`ok:false`에는 설명하는
+   진단이 최소 1개)을 만족시키기 위해 미리보기는 통과로 표시하지 않는다.
+
+### 남은 작업
+
+- 미사용 의존성 스캔(선언했지만 소스에서 참조되지 않는 크레이트) — 저신뢰도이므로
+  `rust_project_inspect`의 별도 파라미터로 추가할 것.
+- `rust_test_select`의 `--all-features` 컴파일 공백 검사(계획 M3 "컴파일 공백").
+- 기존 두 확장(`pi-ros-helper`, `pi-python-helper`)의 코어 마이그레이션: 파일럿이
+  검증됐으므로 별도·되돌릴 수 있는 단계로 진행 가능.
+- `pi-helper-core` npm 배포 후 이 저장소의 `file:` 의존을 고정 버전으로 교체.
+- CI는 `../pi-helper-core`를 위해 코어 저장소를 clone한다. 코어가 npm에 배포되면
+  이 단계를 제거할 수 있다.
+
+### 계획 §11 열린 결정에 대한 확정
+
+1. 저장소 형태: **별도 `pi-helper-core` 저장소** (계획 §3.1 변경 사항대로).
+2. 패키지명: `pi-helper-core`/`pi-rust-helper` (npm 스코프 없음).
+3. 도구 접두사: `rust_*`.
+4. clippy/rustfmt: **선언된 품질 게이트로만** 실행(`clippy.toml`/`[lints.clippy]`/`rustfmt.toml`
+   존재 시). 독립 도구는 만들지 않았다.
+5. publish 규칙: 저장소가 분리되어 있으므로 각 저장소가 `v*` 태그를 쓴다.
+6. 기존 두 확장 마이그레이션: 파일럿 검증 후.
