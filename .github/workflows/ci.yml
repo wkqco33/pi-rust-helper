@@ -30,6 +30,21 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Check (tests, types, format, docs, package contents)
         run: npm run check
+      - name: Debug doctest output
+        if: always() && matrix.node == 22
+        shell: bash
+        run: |
+          rm -rf /tmp/dbg-ws /tmp/dbg-target
+          cp -r test/fixtures/basic-workspace /tmp/dbg-ws
+          cd /tmp/dbg-ws
+          export CARGO_TARGET_DIR=/tmp/dbg-target
+          cargo test --workspace --message-format=json > /tmp/dbg-out.txt 2> /tmp/dbg-err.txt || true
+          echo "== rustdoc =="; command -v rustdoc || echo MISSING
+          echo "== cargo -V =="; cargo -V
+          echo "== stderr headers =="; grep -nE 'Running|Doc-tests|running [0-9]+ test' /tmp/dbg-err.txt || echo NONE
+          echo "== stdout headers =="; grep -nE 'Running|Doc-tests|running [0-9]+ test' /tmp/dbg-out.txt || echo NONE
+          echo "== stderr tail =="; tail -40 /tmp/dbg-err.txt
+          echo "== stdout tail =="; tail -40 /tmp/dbg-out.txt
       - name: Capture the package manifest
         if: always() && matrix.node == 22
         run: npm pack --dry-run --json > pack.json
