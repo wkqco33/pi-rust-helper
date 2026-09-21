@@ -263,6 +263,10 @@ Parameters:
     "path": {
       "type": "string",
       "description": "Project directory or Cargo.toml path. Defaults to the cwd."
+    },
+    "scanUnusedDependencies": {
+      "type": "boolean",
+      "description": "Scan member .rs sources for declared dependencies that are never referenced. Informational: macro-only usage can look unused. Defaults to false."
     }
   }
 }
@@ -391,6 +395,7 @@ Prompt guidelines:
 
 - Use rust_test_select after changing Rust source to narrow cargo test to the affected crates instead of the whole workspace.
 - Rust has no per-file test targets; the selection is a set of crates, so a "narrowed" run is reported in crates, not files.
+- Set checkAllFeatures=true when a change may only compile under the default feature set; it verifies the affected crates with --all-features.
 
 Parameters:
 
@@ -427,6 +432,15 @@ Parameters:
           "const": "none"
         }
       ]
+    },
+    "checkAllFeatures": {
+      "type": "boolean",
+      "description": "Compile the affected crates with --all-features and report a feature-gated compilation gap. Defaults to false."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1800
     },
     "path": {
       "type": "string"

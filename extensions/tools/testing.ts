@@ -376,6 +376,7 @@ export function registerTestingTools(pi: Pi): void {
     promptGuidelines: [
       'Use rust_test_select after changing Rust source to narrow cargo test to the affected crates instead of the whole workspace.',
       'Rust has no per-file test targets; the selection is a set of crates, so a "narrowed" run is reported in crates, not files.',
+      'Set checkAllFeatures=true when a change may only compile under the default feature set; it verifies the affected crates with --all-features.',
     ],
     parameters: Type.Object({
       changedPaths: Type.Optional(Type.Array(Type.String(), { maxItems: 500 })),
@@ -383,6 +384,13 @@ export function registerTestingTools(pi: Pi): void {
       features: Type.Optional(
         Type.Union([Type.Literal('default'), Type.Literal('all'), Type.Literal('none')]),
       ),
+      checkAllFeatures: Type.Optional(
+        Type.Boolean({
+          description:
+            'Compile the affected crates with --all-features and report a feature-gated compilation gap. Defaults to false.',
+        }),
+      ),
+      timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1, maximum: 1800 })),
       path: Type.Optional(Type.String()),
     }),
     async execute(_id, params, signal, _update, ctx) {
@@ -466,9 +474,74 @@ export function registerTestingTools(pi: Pi): void {
           );
         }
 
+        const errors: Diagnostic[] = [];
+        let featureCheck:
+          | {
+              executed: true;
+              ok: boolean;
+              errorCount: number;
+              errorCodes: Record<string, number>;
+              firstFailure?: ReturnType<typeof diagnoseRustFailure>;
+            }
+          | { executed: false; reason: string } = {
+          executed: false,
+          reason: 'Feature compilation was not requested.',
+        };
+        let featureCommand: ReturnType<typeof rustAdapter.checkCommand> | undefined;
+
+        // A change can compile with the default features and fail under the full
+        // feature set. Checking that explicitly is the only way to tell the two
+        // apart before a release build does.
+        if (params.checkAllFeatures && crates.affectedCrates.length > 0) {
+          featureCommand = rustAdapter.checkCommand(
+            { targets: crates.affectedCrates, allTargets: true, extraArgs: ['--all-features'] },
+            adapterCtx,
+          );
+          const run = await runCargo(
+            featureCommand,
+            ctx,
+            signal,
+            params.timeoutSeconds ?? 600,
+            4 * 1024 * 1024,
+          );
+          const combined = `${run.stdout}\n${run.stderr}`;
+          const diagnostics = parseCompilerDiagnostics(combined, { projectRoot: located.root });
+          const compileErrors = diagnostics.filter((entry) => entry.level === 'error');
+          const codes: Record<string, number> = {};
+          for (const entry of compileErrors) {
+            const key = entry.code ?? 'unclassified';
+            codes[key] = (codes[key] ?? 0) + 1;
+          }
+          const ok = run.code === 0 && compileErrors.length === 0 && !run.timedOut;
+          featureCheck = {
+            executed: true,
+            ok,
+            errorCount: compileErrors.length,
+            errorCodes: codes,
+            firstFailure:
+              compileErrors.length > 0
+                ? diagnoseRustFailure(combined, { projectRoot: located.root })
+                : undefined,
+          };
+          if (!ok) {
+            errors.push({
+              code: 'FEATURE_COMPILATION_FAILED',
+              message: run.timedOut
+                ? 'The --all-features check exceeded the time limit.'
+                : `${compileErrors.length} error(s) appear only when the affected crates are compiled with --all-features.`,
+              severity: 'error',
+            });
+          }
+        } else if (params.checkAllFeatures) {
+          featureCheck = {
+            executed: false,
+            reason: 'No affected crate was selected, so there was nothing to compile.',
+          };
+        }
+
         return text(
           result(ctx.cwd, started, {
-            ok: crates.changedCrates.length > 0 || changed.length === 0,
+            ok: (crates.changedCrates.length > 0 || changed.length === 0) && errors.length === 0,
             summary:
               `${crates.changedCrates.length} changed crate(s), ${crates.affectedCrates.length} affected crate(s) ` +
               `from ${changed.length} changed path(s) (${source}).` +
@@ -476,7 +549,12 @@ export function registerTestingTools(pi: Pi): void {
                 ? narrowed
                   ? ''
                   : ' Every member is affected, so nothing was narrowed.'
-                : ' No Rust source change was matched.'),
+                : ' No Rust source change was matched.') +
+              (featureCheck.executed
+                ? featureCheck.ok
+                  ? ' All-features compilation passed.'
+                  : ` All-features compilation failed with ${featureCheck.errorCount} error(s).`
+                : ''),
             data: {
               changedPaths: changed,
               changedSource: source,
@@ -487,6 +565,7 @@ export function registerTestingTools(pi: Pi): void {
               cargoTestTargets: crates.affectedCrates,
               fileSelection,
               reverseDependencies: model.reverseDependencies,
+              featureCheck,
             },
             evidence: [
               {
@@ -498,18 +577,32 @@ export function registerTestingTools(pi: Pi): void {
               },
             ],
             warnings,
-            errors: [],
-            suggestions: command
-              ? [
-                  {
-                    message:
-                      'Run cargo test with -p for the affected crates, or use rust_test with these targets.',
-                    confidence: 'high' as const,
-                    command: `${command.executable} ${command.args.join(' ')}`,
-                  },
-                ]
-              : [],
-            commands: command ? [command] : [],
+            errors,
+            suggestions: [
+              ...(command
+                ? [
+                    {
+                      message:
+                        'Run cargo test with -p for the affected crates, or use rust_test with these targets.',
+                      confidence: 'high' as const,
+                      command: `${command.executable} ${command.args.join(' ')}`,
+                    },
+                  ]
+                : []),
+              ...(featureCheck.executed && !featureCheck.ok
+                ? [
+                    {
+                      message:
+                        'A feature-gated compilation failure exists. Fix it, or confirm the feature is not part of the supported matrix.',
+                      confidence: 'high' as const,
+                      command: featureCommand
+                        ? `${featureCommand.executable} ${featureCommand.args.join(' ')}`
+                        : undefined,
+                    },
+                  ]
+                : []),
+            ],
+            commands: [...(command ? [command] : []), ...(featureCommand ? [featureCommand] : [])],
             projectRoot: located.root,
           }),
         );

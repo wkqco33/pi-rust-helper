@@ -1,6 +1,7 @@
 import { Type } from 'typebox';
 import type { Diagnostic } from '../../src/core/result.ts';
 import { failure, note, result, warn } from '../../src/core/result.ts';
+import { findUnusedDependencies } from '../../src/rust/dependencies.ts';
 import { diagnoseRustFailure } from '../../src/rust/failure.ts';
 import { dependencySummary, msrvWarnings, readProjectModel } from '../../src/rust/metadata.ts';
 import { inspectToolchain } from '../../src/rust/toolchain.ts';
@@ -20,6 +21,12 @@ export function registerProjectTools(pi: Pi): void {
     parameters: Type.Object({
       path: Type.Optional(
         Type.String({ description: 'Project directory or Cargo.toml path. Defaults to the cwd.' }),
+      ),
+      scanUnusedDependencies: Type.Optional(
+        Type.Boolean({
+          description:
+            'Scan member .rs sources for declared dependencies that are never referenced. Informational: macro-only usage can look unused. Defaults to false.',
+        }),
       ),
     }),
     async execute(_id, params, signal, _update, ctx) {
@@ -83,6 +90,9 @@ export function registerProjectTools(pi: Pi): void {
 
         const model = read.model;
         const dependencies = dependencySummary(read.raw);
+        const unused = params.scanUnusedDependencies
+          ? await findUnusedDependencies(model)
+          : undefined;
         const warnings: Diagnostic[] = [
           ...model.warnings,
           ...msrvWarnings(model, toolchain.rustc?.release),
@@ -114,6 +124,15 @@ export function registerProjectTools(pi: Pi): void {
                   'The dependency graph was not resolved, so duplicate versions and source kinds are not exhaustive.',
                 ),
               ]),
+          ...(unused?.findings ?? []).map((finding) =>
+            note(
+              'UNUSED_DEPENDENCY',
+              `${finding.member}: the ${finding.kind} dependency "${finding.dependency}" is declared but no .rs file references \`${finding.crate}\`. Confirm macro or build-script usage before removing it.`,
+            ),
+          ),
+          ...(unused?.incompleteReason
+            ? [note('UNUSED_DEPENDENCY_SCAN_INCOMPLETE', unused.incompleteReason)]
+            : []),
         ];
         const actionable = warnings.filter((warning) => warning.severity !== 'info');
 
@@ -127,15 +146,26 @@ export function registerProjectTools(pi: Pi): void {
           `${model.lockPresent ? 'Cargo.lock present' : 'no Cargo.lock'} · ` +
           `${model.members.reduce((total, entry) => total + entry.appliedFeatures.length, 0)} applied feature(s)`;
 
-        const suggestions = actionable
-          .filter((warning) => warning.code === 'MSRV_UNSATISFIED')
-          .map((warning) => ({
-            message: warning.message,
-            confidence: 'high' as const,
-            command: warning.message.includes('rust-version')
-              ? `rustup toolchain install ${model.members.find((entry) => warning.message.includes(entry.name))?.minimumToolchain ?? ''}`.trim()
-              : undefined,
-          }));
+        const suggestions = [
+          ...actionable
+            .filter((warning) => warning.code === 'MSRV_UNSATISFIED')
+            .map((warning) => ({
+              message: warning.message,
+              confidence: 'high' as const,
+              command: warning.message.includes('rust-version')
+                ? `rustup toolchain install ${model.members.find((entry) => warning.message.includes(entry.name))?.minimumToolchain ?? ''}`.trim()
+                : undefined,
+            })),
+          ...(unused && unused.findings.length > 0
+            ? [
+                {
+                  message:
+                    'If a reported dependency is genuinely unused, remove it with cargo remove; otherwise ignore the hint, because derive macros and build scripts can reference a crate without naming it.',
+                  confidence: 'low' as const,
+                },
+              ]
+            : []),
+        ];
 
         return text(
           result(ctx.cwd, started, {
@@ -160,7 +190,17 @@ export function registerProjectTools(pi: Pi): void {
                 dependencies: entry.dependencies,
               })),
               reverseDependencies: model.reverseDependencies,
-              dependencies,
+              dependencies: {
+                ...dependencies,
+                unused: unused
+                  ? {
+                      scanned: unused.scanned,
+                      filesScanned: unused.filesScanned,
+                      findings: unused.findings,
+                    }
+                  : null,
+                unusedScanIncompleteReason: unused?.incompleteReason ?? null,
+              },
             },
             evidence: [
               {

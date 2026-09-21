@@ -20,6 +20,15 @@ export interface RustTarget {
   srcPath: string;
 }
 
+export interface DeclaredDependency {
+  /** The dependency as written in Cargo.toml. */
+  name: string;
+  /** The crate identifier the source must reference (`-` becomes `_`, rename wins). */
+  crate: string;
+  kind: 'normal' | 'dev' | 'build';
+  optional: boolean;
+}
+
 export interface RustPackage extends ProjectPackage {
   id: string;
   root: string;
@@ -28,6 +37,8 @@ export interface RustPackage extends ProjectPackage {
   /** Features actually unified in for this build, from `resolve.nodes`. */
   appliedFeatures: string[];
   dependencies: string[];
+  /** Declared direct dependencies with the crate name the source would use. */
+  declared: DeclaredDependency[];
 }
 
 export interface RustProjectModel extends ProjectModel {
@@ -57,7 +68,12 @@ interface RawPackage {
     doctest?: boolean;
     src_path: string;
   }[];
-  dependencies?: { name: string }[];
+  dependencies?: {
+    name: string;
+    rename?: string | null;
+    kind?: string | null;
+    optional?: boolean;
+  }[];
 }
 
 interface RawMetadata {
@@ -166,8 +182,17 @@ export function modelFromMetadata(raw: RawMetadata, lockPresent: boolean): RustP
         doctest: target.doctest === true,
         srcPath: target.src_path,
       }));
-      const declared = Object.keys(entry.features ?? {}).sort();
+      const declaredFeatures = Object.keys(entry.features ?? {}).sort();
       const appliedFeatures = [...(applied.get(entry.id) ?? [])].sort();
+      const declaredDependencies: DeclaredDependency[] = (entry.dependencies ?? []).map(
+        (dependency) => ({
+          name: dependency.name,
+          crate: (dependency.rename ?? dependency.name).replace(/-/g, '_'),
+          kind:
+            dependency.kind === 'dev' ? 'dev' : dependency.kind === 'build' ? 'build' : 'normal',
+          optional: dependency.optional === true,
+        }),
+      );
       return {
         id: entry.id,
         name: entry.name,
@@ -178,13 +203,14 @@ export function modelFromMetadata(raw: RawMetadata, lockPresent: boolean): RustP
         defaultMember: defaultIds.has(entry.id),
         minimumToolchain: entry.rust_version ?? undefined,
         targets,
-        features: declared,
+        features: declaredFeatures,
         appliedFeatures,
-        dependencies: (entry.dependencies ?? []).map((dependency) => dependency.name).sort(),
+        dependencies: declaredDependencies.map((dependency) => dependency.name).sort(),
+        declared: declaredDependencies,
         detail: {
           edition: entry.edition ?? '',
           source: entry.source ?? 'path',
-          declaredFeatures: declared.join(', ') || '(none)',
+          declaredFeatures: declaredFeatures.join(', ') || '(none)',
           appliedFeatures: appliedFeatures.join(', ') || '(none)',
           testTargets: targets
             .filter((target) => target.test)
