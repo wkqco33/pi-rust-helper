@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   assertEnvelope,
   errorCodes,
@@ -257,3 +260,40 @@ test('the shared report type stays the shape the adapter promises', async () => 
     assert.ok(Array.isArray(report.ranTargets));
   });
 });
+
+test(
+  'a tool given a project path runs cargo in that project, not the session cwd',
+  rustProject,
+  async () => {
+    await withFixture('basic-workspace', async (directory) => {
+      await primeLockfile(directory);
+      const session = await mkdtemp(join(tmpdir(), 'rust-session-'));
+      try {
+        // `ctx.cwd` holds no Cargo.toml; only `path` names the project, so a
+        // tool that runs cargo in the session directory would fail here.
+        const inspected = await invokeTool<{ packages: { name: string }[] }>(
+          'rust_project_inspect',
+          { path: directory },
+          session,
+        );
+        assertEnvelope(inspected, 'rust_project_inspect');
+        assert.equal(inspected.ok, true, inspected.summary);
+        assert.deepEqual(
+          inspected.data?.packages.map((entry) => entry.name),
+          ['probe-app', 'probe-core'],
+        );
+
+        const tested = await invokeTool<TestData>(
+          'rust_test',
+          { path: directory, execute: true },
+          session,
+        );
+        assertEnvelope(tested, 'rust_test');
+        assert.equal(tested.ok, true, tested.summary);
+        assert.deepEqual(tested.data?.testedPackages, ['probe-app', 'probe-core']);
+      } finally {
+        await rm(session, { recursive: true, force: true });
+      }
+    });
+  },
+);

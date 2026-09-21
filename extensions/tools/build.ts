@@ -108,7 +108,7 @@ export function registerBuildTools(pi: Pi): void {
         }
 
         const run = await runCommand(command.executable, command.args, {
-          cwd: ctx.cwd,
+          cwd: command.cwd ?? ctx.cwd,
           signal,
           timeoutMs: (params.timeoutSeconds ?? 1800) * 1000,
           maxBytes: 4 * 1024 * 1024,

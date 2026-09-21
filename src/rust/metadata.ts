@@ -457,7 +457,9 @@ export async function readProjectModel(
 
 async function runMetadata(command: { executable: string; args: string[] }, ctx: AdapterContext) {
   return runCommand(command.executable, command.args, {
-    cwd: ctx.cwd,
+    // Run where the command was built for (`projectRoot`), not the session cwd:
+    // a project reached through `path` must be the directory cargo reads.
+    cwd: ctx.projectRoot ?? ctx.cwd,
     signal: ctx.signal,
     timeoutMs: 120000,
     maxBytes: 4 * 1024 * 1024,

@@ -68,14 +68,14 @@ interface ScopedRun {
 }
 
 async function runCargo(
-  command: { executable: string; args: string[] },
+  command: { executable: string; args: string[]; cwd?: string },
   ctx: Ctx,
   signal: AbortSignal | undefined,
   timeoutSeconds: number,
   maxBytes: number,
 ): Promise<ScopedRun> {
   const run = await runCommand(command.executable, command.args, {
-    cwd: ctx.cwd,
+    cwd: command.cwd ?? ctx.cwd,
     signal,
     timeoutMs: timeoutSeconds * 1000,
     maxBytes,
@@ -419,7 +419,7 @@ export function registerTestingTools(pi: Pi): void {
         let changed = params.changedPaths ?? [];
         let source = 'argument';
         if (changed.length === 0) {
-          const discovered = await changedPathsFromGit(ctx.cwd, signal);
+          const discovered = await changedPathsFromGit(located.root, signal);
           changed = discovered.paths;
           source = discovered.source;
         }
@@ -858,14 +858,18 @@ export function registerTestingTools(pi: Pi): void {
     parameters: Type.Object({
       changedPaths: Type.Optional(Type.Array(Type.String(), { maxItems: 500 })),
       testChangedPaths: Type.Optional(Type.Array(Type.String(), { maxItems: 500 })),
+      path: Type.Optional(Type.String()),
     }),
     async execute(_id, params, signal, _update, ctx) {
       const started = Date.now();
       try {
+        // Git discovery must read the project the caller named, not the session
+        // directory, or an uncommitted change in the project is invisible.
+        const located = await resolveProject(ctx.cwd, params.path);
         let changed = params.changedPaths ?? [];
         let source = 'argument';
         if (changed.length === 0) {
-          const discovered = await changedPathsFromGit(ctx.cwd, signal);
+          const discovered = await changedPathsFromGit(located.root ?? ctx.cwd, signal);
           changed = discovered.paths;
           source = discovered.source;
         }

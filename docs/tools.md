@@ -302,6 +302,9 @@ Parameters:
         "type": "string"
       },
       "maxItems": 500
+    },
+    "path": {
+      "type": "string"
     }
   }
 }

@@ -221,7 +221,7 @@ export function registerValidationTools(pi: Pi): void {
         }
 
         const lockRun = await runCommand(lockCommand.executable, lockCommand.args, {
-          cwd: ctx.cwd,
+          cwd: located.root,
           signal,
           timeoutMs,
           maxBytes: 512 * 1024,
@@ -242,7 +242,7 @@ export function registerValidationTools(pi: Pi): void {
         const checkRun =
           lockStep.ok && !lockRun.timedOut
             ? await runCommand(checkCommand.executable, checkCommand.args, {
-                cwd: ctx.cwd,
+                cwd: located.root,
                 signal,
                 timeoutMs,
                 maxBytes: 4 * 1024 * 1024,
@@ -264,7 +264,7 @@ export function registerValidationTools(pi: Pi): void {
         const testRun =
           checkStep.ok && !checkRun?.timedOut
             ? await runCommand(testCommand.executable, testCommand.args, {
-                cwd: ctx.cwd,
+                cwd: located.root,
                 signal,
                 timeoutMs,
                 maxBytes: 8 * 1024 * 1024,
@@ -304,7 +304,7 @@ export function registerValidationTools(pi: Pi): void {
             continue;
           }
           const run = await runCommand(entry.command.executable, entry.command.args, {
-            cwd: ctx.cwd,
+            cwd: located.root,
             signal,
             timeoutMs,
             maxBytes: 4 * 1024 * 1024,
